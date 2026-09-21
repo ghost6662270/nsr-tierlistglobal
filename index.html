@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blox Strike - Competitive Tier List</title>
+    <style>
+        :root {
+            --bg-color: #0f1117;
+            --card-bg: #1a1d26;
+            --text-color: #ffffff;
+            --accent-color: #00ff7f;
+            --border-color: #2a2e3d;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1000px;
+            margin: 0 auto 30px auto;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .title-group h1 {
+            margin: 0;
+            font-size: 2rem;
+            color: var(--accent-color);
+        }
+
+        .title-group p {
+            margin: 5px 0 0 0;
+            color: #8a8f9d;
+        }
+
+        /* Dil Seçici Stil */
+        .lang-select {
+            background-color: var(--card-bg);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            outline: none;
+        }
+
+        .lang-select:hover {
+            border-color: var(--accent-color);
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .tier-section {
+            background-color: var(--card-bg);
+            border-radius: 8px;
+            margin-bottom: 25px;
+            padding: 20px;
+            border: 1px solid var(--border-color);
+        }
+
+        .tier-title {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .tier-t1 { color: #ff4757; }
+        .tier-t2 { color: #ffa502; }
+        .tier-t3 { color: #eccc68; }
+        .tier-t4 { color: #1e90ff; }
+        .tier-t5 { color: #2ed573; }
+
+        .player-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .player-card {
+            background-color: #222634;
+            border-radius: 6px;
+            padding: 12px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border: 1px solid transparent;
+            transition: transform 0.2s, border-color 0.2s;
+        }
+
+        .player-card:hover {
+            transform: translateY(-2px);
+            border-color: var(--accent-color);
+        }
+
+        .player-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background-color: #10121a;
+            object-fit: cover;
+        }
+
+        .player-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .player-name {
+            font-weight: bold;
+            font-size: 1rem;
+        }
+
+        .player-meta {
+            font-size: 0.8rem;
+            color: #8a8f9d;
+        }
+    </style>
+
+    <!-- Firebase SDK (v9+) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        // Firebase Yapılandırmanız
+        const firebaseConfig = {
+            databaseURL: "https://nsr-tierlist-default-rtdb.europe-west1.firebasedatabase.app/"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        // Dil Sözlüğü (TR, EN, DE)
+        const translations = {
+            tr: {
+                mainTitle: "Blox Strike Competitive Tier List",
+                subTitle: "Canlı Oyuncu Sıralaması ve Tier Listesi",
+                createdYear: "Katılım Yılı:",
+                noPlayers: "Bu tier grubunda henüz oyuncu yok.",
+                loading: "Veriler yükleniyor..."
+            },
+            en: {
+                mainTitle: "Blox Strike Competitive Tier List",
+                subTitle: "Live Player Leaderboard and Tier List",
+                createdYear: "Joined:",
+                noPlayers: "No players in this tier yet.",
+                loading: "Loading data..."
+            },
+            de: {
+                mainTitle: "Blox Strike Wettkampf-Tier-Liste",
+                subTitle: "Live-Spieler-Rangliste und Tier-Liste",
+                createdYear: "Beigetreten:",
+                noPlayers: "Noch keine Spieler in dieser Stufe.",
+                loading: "Daten werden geladen..."
+            }
+        };
+
+        let currentLang = localStorage.getItem('siteLang') || 'tr';
+        let globalPlayersData = {};
+
+        // Dili Değiştirme Fonksiyonu
+        window.changeLanguage = function(lang) {
+            currentLang = lang;
+            localStorage.setItem('siteLang', lang);
+            document.getElementById('langSelect').value = lang;
+            
+            // Metinleri Güncelle
+            document.getElementById('mainTitle').innerText = translations[lang].mainTitle;
+            document.getElementById('subTitle').innerText = translations[lang].subTitle;
+
+            // Listeyi Yeniden Çiz
+            renderLeaderboard(globalPlayersData);
+        };
+
+        // Verileri Firebase'den Çek ve Çiz
+        const playersRef = ref(db, 'players');
+        onValue(playersRef, (snapshot) => {
+            globalPlayersData = snapshot.val() || {};
+            renderLeaderboard(globalPlayersData);
+        });
+
+        function renderLeaderboard(playersData) {
+            const tiers = ['T1', 'T2', 'T3', 'T4', 'T5'];
+            const container = document.getElementById('tierContainer');
+            container.innerHTML = '';
+
+            tiers.forEach(tier => {
+                const section = document.createElement('div');
+                section.className = 'tier-section';
+
+                const title = document.createElement('div');
+                title.className = `tier-title tier-${tier.toLowerCase()}`;
+                title.innerText = tier;
+                section.appendChild(title);
+
+                const grid = document.createElement('div');
+                grid.className = 'player-grid';
+
+                let count = 0;
+                for (let key in playersData) {
+                    const player = playersData[key];
+                    if (player.tier === tier) {
+                        count++;
+                        const card = document.createElement('div');
+                        card.className = 'player-card';
+                        card.innerHTML = `
+                            <img class="player-avatar" src="${player.avatarUrl}" alt="${player.username}">
+                            <div class="player-info">
+                                <span class="player-name">${player.username}</span>
+                                <span class="player-meta">${translations[currentLang].createdYear} ${player.createdYear}</span>
+                            </div>
+                        `;
+                        grid.appendChild(card);
+                    }
+                }
+
+                if (count === 0) {
+                    grid.innerHTML = `<span style="color: #6c757d; font-size: 0.9rem;">${translations[currentLang].noPlayers}</span>`;
+                }
+
+                section.appendChild(grid);
+                container.appendChild(section);
+            });
+        }
+
+        // Sayfa Yüklendiğinde
+        window.addEventListener('DOMContentLoaded', () => {
+            changeLanguage(currentLang);
+        });
+    </script>
+</head>
+<body>
+
+    <div class="header">
+        <div class="title-group">
+            <h1 id="mainTitle">Blox Strike Competitive Tier List</h1>
+            <p id="subTitle">Canlı Oyuncu Sıralaması ve Tier Listesi</p>
+        </div>
+        
+        <!-- Dil Seçenekleri Dropdown -->
+        <select id="langSelect" class="lang-select" onchange="changeLanguage(this.value)">
+            <option value="tr">🇹🇷 Türkçe</option>
+            <option value="en">🇬🇧 English</option>
+            <option value="de">🇩🇪 Deutsch</option>
+        </select>
+    </div>
+
+    <div class="container" id="tierContainer">
+        <!-- Tierlar JS ile Dinamik Dolacak -->
+    </div>
+
+</body>
+</html>
